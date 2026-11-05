@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: spotter-weather-routing
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: TRUCK_EMPTY_WEIGHT_LB
+        value: "18000"
+      - key: WEB_CONCURRENCY
+        value: "1"
