@@ -227,7 +227,7 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 
 ## Known limitations
 
-- Live TomTom routing requires your API key; unit/integration fixtures cannot verify account access.
+- Live TomTom geocoding and the three-route Dallas → Austin truck flow were verified locally. A valid server-side API key remains required in each environment; automated fixtures alone do not verify account authorization.
 - Forecast horizon varies by weather model, field, location, and departure; requested 16-day data is not a guarantee of complete coverage.
 - Only cargo weight is entered by the user. Truck empty weight/dimensions are operator configuration; unspecified dimensions are not checked.
 - The route recommendation follows the assessment's load rules exactly, including their supplied heavier-load wind overrides.

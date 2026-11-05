@@ -16,12 +16,15 @@ This records checks actually executed during implementation. Provider fixtures a
 | Container root page | HTTP 200, production React index verified |
 | Container `/api/health/` | HTTP 200, real Django response, demo mode false |
 | Container JS and CSS assets | HTTP 200, production asset content verified |
-| Live TomTom geocoding and routing | **Not verified: API key not configured** |
+| Live TomTom geocoding and routing | Passed: real Dallas → Austin trip returned three distinct truck routes |
+| Live browser flow through React/Vite and Django | Passed: three routes, loaded map, checkpoint inspection, +48-hour forecast, zero browser page errors |
 | Public hosting | **Not deployed: account connection required** |
 | GitHub publishing | **Not published: account connection required** |
 | Loom recording/upload | **Not performed; script prepared** |
 
 ## Calculation and API coverage
+
+Live verification on November 6, 2026 used Dallas → Austin, departure approximately one hour ahead, 35,000 lb cargo, and 25-mile sampling. TomTom returned three truck routes of approximately 196.8, 206.5, and 262.3 miles, with 9, 10, and 12 checkpoints. All had 100% arrival-time weather coverage. Both 0-hour and +48-hour corridor forecasts returned all 81 samples without missing data, and the ranking selected Route 1. The same flow also passed through the actual React page and running Django server: all three cards rendered, the basemap loaded, a checkpoint opened, and the slider retrieved the +48-hour forecast with no browser page errors. These are observations from that forecast snapshot, not fixed application data. The key is stored only in the ignored local backend environment file and is not included in this record.
 
 - Exact supplied wind/rain/snow thresholds and fractional wind intervals.
 - Strict cargo thresholds at 30,000 and 40,000 lb.
@@ -61,12 +64,12 @@ HTTP container checks can be repeated with `python scripts/verify_http.py http:/
 | Original requirement | State |
 |---|---|
 | React + Django, input form, validation | Complete |
-| Up to three actual routing alternatives | Implementation complete; live verification blocked by TomTom key |
+| Up to three actual routing alternatives | Complete; live TomTom geocoding and three-route truck calculation verified |
 | Geometry-based 10/25/50-mile checkpoints and ETA | Complete; automated calculation coverage |
 | Arrival-time weather | Complete; integration fixtures plus live weather-provider verification |
 | Exact weather/load rules and deterministic ranking | Complete; tested |
-| Map, alternatives, checkpoints, ETAs, summaries | Complete; browser-tested with isolated route fixtures |
-| Forecast-backed corridor layer and 0–48-hour slider | Complete; provider-backed implementation and browser/API tests |
+| Map, alternatives, checkpoints, ETAs, summaries | Complete; isolated browser tests plus a verified live three-route browser flow |
+| Forecast-backed corridor layer and 0–48-hour slider | Complete; browser/API tests and live +48-hour forecast inspection |
 | GitHub repository URL | Blocked by external account connection; local repository prepared |
 | Hosted application URL | Blocked by external account/key configuration; deployment files prepared |
 | 5–10-minute Loom | Partially complete: walkthrough script prepared; actual recording outstanding |
