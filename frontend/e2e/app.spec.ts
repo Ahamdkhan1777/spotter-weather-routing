@@ -64,6 +64,31 @@ test('displays setup limitations and has no horizontal overflow on mobile', asyn
   await page.screenshot({ path: 'test-results/mobile-setup.png', fullPage: true })
 })
 
+test('clears stale setup status automatically without reloading or losing trip inputs', async ({ page }) => {
+  await mockAPI(page, false)
+  let configured = false
+  await page.route('**/api/health/', route => route.fulfill({ json: { status: 'ok', routing_configured: configured, demo_mode: false } }))
+  await page.goto('/')
+  await expect(page.getByText('Connect your routing provider to get started')).toBeVisible()
+  await page.getByLabel('Origin', { exact: true }).fill('Houston, TX')
+  configured = true
+  await expect(page.getByText('Routing service ready', { exact: true })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText('Connect your routing provider to get started')).toHaveCount(0)
+  await expect(page.getByLabel('Origin', { exact: true })).toHaveValue('Houston, TX')
+})
+
+test('allows an immediate configuration recheck from the setup banner', async ({ page }) => {
+  await mockAPI(page, false)
+  let configured = false
+  await page.route('**/api/health/', route => route.fulfill({ json: { status: 'ok', routing_configured: configured, demo_mode: false } }))
+  await page.goto('/')
+  await expect(page.getByText('Connect your routing provider to get started')).toBeVisible()
+  configured = true
+  await page.getByRole('button', { name: 'Check again', exact: true }).click()
+  await expect(page.getByText('Routing service ready', { exact: true })).toBeVisible()
+  await expect(page.getByText('Connect your routing provider to get started')).toHaveCount(0)
+})
+
 test('shows API errors and allows a corrected retry', async ({ page }) => {
   await mockAPI(page)
   await page.route('**/api/routes/calculate/', route => route.fulfill({ status: 504, json: { error: { message: 'TomTom routing timed out. Please retry.' } } }))

@@ -82,6 +82,8 @@ npm run dev
 
 Open **http://127.0.0.1:5173**. Vite proxies `/api` to Django at port 8000. Health is at **http://127.0.0.1:8000/api/health/**. The frontend starts without a key and shows setup instructions; route calculation returns an explicit 503 until routing is configured.
 
+After changing `backend/.env`, restart Django. The setup banner rechecks every five seconds while routing is unavailable and also offers **Check again**. Returning to the browser tab refreshes service status, so an old setup message clears without losing trip inputs.
+
 macOS/Linux equivalents use `python3 -m venv .venv`, `.venv/bin/python`, and `cp backend/.env.example backend/.env`. From `backend`, use `../.venv/bin/python manage.py runserver`.
 
 ## Environment configuration

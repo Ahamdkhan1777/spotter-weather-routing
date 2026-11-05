@@ -53,6 +53,8 @@ Desktop/mobile screenshots were captured and inspected. Screenshot review expose
 
 ## Production notes
 
+Provider-status recovery was verified after fixing a stale setup banner: five hook tests passed for automatic polling, manual recovery, focus refresh, cleanup, and late responses; three focused Chromium checks passed for the setup state, automatic recovery without losing inputs, and immediate manual rechecking. The TypeScript/Vite production build passed. A separate check against the real running frontend confirmed `Routing service ready` and no setup banner; backend and Vite-proxied health both reported routing configured. No credentials were changed for this fix.
+
 The build emits a size notice for the MapLibre library (approximately 285 KB gzipped). It is split from the main application and loaded with the lazy map component. This is a notice, not a failed build.
 
 The production image serves frontend/API under one origin. It uses a single Gunicorn process with four threads because the forecast/trip cache is process-local. A restart or new replica invalidates cached trips; the API returns an explicit expired-trip error.

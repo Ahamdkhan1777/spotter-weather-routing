@@ -5,15 +5,15 @@ import { RouteCard } from './components/RouteCard'
 import { CheckpointDetails } from './components/CheckpointDetails'
 import { RiskBadge } from './components/RiskBadge'
 import { useForecast } from './hooks/useForecast'
+import { useServiceHealth } from './hooks/useServiceHealth'
 import { api } from './services/api'
-import type { Health, Trip, TripInput } from './types'
+import type { Trip, TripInput } from './types'
 import { dateTime, duration, number } from './utils'
 
 const MapPanel = lazy(() => import('./components/MapPanel'))
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null>(null)
-  const [healthError, setHealthError] = useState('')
+  const { health, error: healthError, refreshing: healthRefreshing, retry: retryHealth } = useServiceHealth()
   const [trip, setTrip] = useState<Trip | null>(null)
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null)
   const [checkpointId, setCheckpointId] = useState<string | null>(null)
@@ -23,10 +23,8 @@ export default function App() {
   const [heatmap, setHeatmap] = useState(true)
   const [showNotes, setShowNotes] = useState(false)
   const [showRules, setShowRules] = useState(false)
-  const [healthRetry, setHealthRetry] = useState(0)
   const request = useRef<AbortController | null>(null)
   const { data: forecast, loading: forecastLoading, error: forecastError, retry: retryForecast } = useForecast(trip?.id, hour)
-  useEffect(() => { let active = true; api.health().then(result => { if (active) { setHealth(result); setHealthError('') } }).catch(error => { if (active) setHealthError(error.message) }); return () => { active = false } }, [healthRetry])
   useEffect(() => () => request.current?.abort(), [])
   const route = trip?.routes.find(route => route.id === selectedRoute)
   const checkpoint = route?.checkpoints.find(cp => cp.id === checkpointId) || null
@@ -57,7 +55,7 @@ export default function App() {
     <div className="workspace"><aside className="sidebar"><TripForm onSubmit={calculate} loading={loading} configured={!!health?.routing_configured} onCancel={() => { request.current?.abort(); setLoading(false) }} /><div className="sidebar-bottom"><div><span className="mini-logo"><CloudSun size={18} /></span><p>Weather changes.<br /><strong>Your plan should keep up.</strong></p></div><button className="text-button" onClick={() => setShowRules(true)}><CircleHelp size={14} />How risk is calculated<ArrowRight size={13} /></button></div></aside>
     <main className="main-content">
       <div className="page-title-row"><div><div className="section-eyebrow">THE WEATHER-AWARE ROUTE PLANNER</div><h1>Your route. A clearer outlook.</h1><p>Compare the road ahead, with weather and your load in mind.</p></div><div className="title-icon"><CloudSun size={30} strokeWidth={1.3} /></div></div>
-      {(healthError || (health && !health.routing_configured)) && <div className="setup-banner"><Info size={18} /><div><strong>{healthError ? 'Backend connection unavailable' : 'Connect your routing provider to get started'}</strong><p>{healthError || <>Add your TomTom API key to <code>backend/.env</code> and restart Django. Routes and forecasts use real provider data.</>}</p></div>{healthError && <button onClick={() => setHealthRetry(value => value+1)}>Retry connection</button>}</div>}
+      {(healthError || (health && !health.routing_configured)) && <div className="setup-banner"><Info size={18} /><div><strong>{healthError ? 'Backend connection unavailable' : 'Connect your routing provider to get started'}</strong><p>{healthError || <>Add your TomTom API key to <code>backend/.env</code> and restart Django. Routes and forecasts use real provider data.</>}</p></div><button onClick={retryHealth} disabled={healthRefreshing}>{healthRefreshing ? 'Checking…' : healthError ? 'Retry connection' : 'Check again'}</button></div>}
       {error && <div className="error-banner" role="alert"><TriangleAlert size={18} /><div><strong>We couldn’t calculate this trip</strong><p>{error}</p><small>Update the trip details or use “Find the safest route” to retry.</small></div><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
       <section className="map-section" aria-label="Route map and forecast"><Suspense fallback={<div className="map-loading"><LoaderCircle className="spin" size={24} />Loading map…</div>}><MapPanel trip={trip} selectedRoute={selectedRoute} forecast={forecast} heatmap={heatmap} checkpoint={checkpoint} onRoute={chooseRoute} onCheckpoint={chooseCheckpoint} onHeatmap={() => setHeatmap(value => !value)} /></Suspense>
       {loading && <div className="calculation-overlay" role="status"><LoaderCircle className="spin" size={22} /><div><strong>Reading the road ahead</strong><span>Finding truck routes and matching weather to arrival times…</span></div></div>}

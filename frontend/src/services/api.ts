@@ -24,7 +24,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  health: () => request<Health>('/health/'),
+  health: () => request<Health>('/health/', { cache: 'no-store' }),
   places: (query: string, signal: AbortSignal) => request<{ places: Place[] }>(`/places/?q=${encodeURIComponent(query)}`, { signal }),
   calculate: (input: TripInput, signal: AbortSignal) => request<Trip>('/routes/calculate/', { method: 'POST', body: JSON.stringify(input), signal }),
   forecast: (id: string, hour: number, signal: AbortSignal) => request<Forecast>(`/trips/${id}/forecast/?hour=${hour}`, { signal }),
