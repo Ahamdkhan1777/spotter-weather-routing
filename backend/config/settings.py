@@ -14,8 +14,6 @@ if not DEBUG and SECRET_KEY in ('development-only-spotter-key', 'local-developme
     raise ValueError('Set a unique SECRET_KEY before running in production.')
 ALLOWED_HOSTS = [x.strip() for x in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',') if x.strip()]
 ALLOWED_HOSTS.extend(deployment_hosts(os.environ))
-if os.getenv('RENDER_EXTERNAL_HOSTNAME'):
-    ALLOWED_HOSTS.append(os.environ['RENDER_EXTERNAL_HOSTNAME'])
 INSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.staticfiles', 'rest_framework', 'corsheaders', 'routing']
 MIDDLEWARE = ['django.middleware.security.SecurityMiddleware', 'corsheaders.middleware.CorsMiddleware', 'django.middleware.common.CommonMiddleware']
 MIDDLEWARE.append('config.middleware.CacheUnavailableMiddleware')

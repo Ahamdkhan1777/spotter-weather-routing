@@ -41,8 +41,8 @@ frontend/
   src/services/          Typed HTTP client
   e2e/                   Isolated browser fixtures and interaction tests
 docs/                    API contract
-Dockerfile               Production frontend build + Django runtime
-render.yaml              Single-service deployment blueprint
+vercel.json              Production Vercel Services routing and build configuration
+Dockerfile               Optional local frontend build + Django runtime
 .github/workflows/ci.yml  Backend, frontend, build, and browser checks
 ```
 
@@ -94,7 +94,8 @@ macOS/Linux equivalents use `python3 -m venv .venv`, `.venv/bin/python`, and `cp
 | `TOMTOM_API_KEY` | Required private Search/Routing key; never sent to the browser |
 | `DJANGO_DEBUG` | `true` locally; `false` in production |
 | `SECRET_KEY` | Unique random production secret; production rejects the supplied development values |
-| `ALLOWED_HOSTS` | Comma-separated backend hostnames; Render hostname is included automatically |
+| `ALLOWED_HOSTS` | Comma-separated backend hostnames; Vercel deployment, branch and production hosts are included automatically |
+| `REDIS_URL` | Required TLS Redis TCP URL on Vercel; blank locally uses process-memory caching |
 | `CORS_ALLOWED_ORIGINS` | Exact frontend origins for split hosting; default local Vite origins |
 | `TRUCK_EMPTY_WEIGHT_LB` | Empty vehicle weight, default 18,000 lb; cargo is added before TomTom's kg conversion |
 | `TRUCK_HEIGHT_M`, `TRUCK_WIDTH_M`, `TRUCK_LENGTH_M` | Optional real vehicle dimensions in metres; blank/whitespace means unspecified. Configured values must be finite and positive; restart Django after changing them |
@@ -106,7 +107,7 @@ macOS/Linux equivalents use `python3 -m venv .venv`, `.venv/bin/python`, and `cp
 
 | Frontend variable | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | Empty for local proxy or same-origin Docker; full backend origin for split hosting |
+| `VITE_API_BASE_URL` | Empty for local proxy and same-origin Vercel/Docker; full backend origin only for split hosting |
 | `VITE_MAP_STYLE_URL` | Public MapLibre style URL used in both themes; defaults to CARTO Positron |
 
 Frontend variables are public build-time configuration. Do not place private credentials in any `VITE_*` variable. `.env` files are ignored by Git and Docker.
@@ -166,7 +167,7 @@ The 0–48-hour slider is anchored to the **trip departure instant**. It request
 
 MapLibre renders one heatmap per risk category so color represents risk rather than falsely presenting dense Low-risk samples as High risk. Spatial kernels visualize sparse forecast samples; this is not radar or a continuously observed weather field. Unknown corridor samples have gray markers and an unavailable-count message. Checkpoint details show both arrival-time weather and the slider's selected-hour weather. Road-segment colors and recommendations always retain arrival-time risk.
 
-Forecast requests debounce by 160 ms, cancel stale requests, and cache visited hours in the browser. The map instance is preserved and source data updates in place. Geocoding debounces by 450 ms. Weather requests deduplicate coordinates, batch 25 locations, and use at most three concurrent provider requests; successful weather is cached 15 minutes. Trips expire after one hour or a server restart. Trip forecasts are snapshots; recalculate to refresh them.
+Forecast requests debounce by 160 ms, cancel stale requests, and cache visited hours in the browser. The map instance is preserved and source data updates in place. Geocoding debounces by 450 ms. Weather requests deduplicate coordinates, batch 25 locations, and use at most three concurrent provider requests; successful weather is cached 15 minutes. Trips expire after one hour. Local memory-cache trips are also lost on a server restart; Vercel Redis trips survive individual instance restarts but a new deployment uses a separate cache namespace. Trip forecasts are snapshots; recalculate to refresh them.
 
 ## API
 
@@ -208,9 +209,9 @@ npm.cmd run test:cross-browser
 
 Backend tests cover supplied thresholds, load boundaries, invalid weather, geometry and ETA sampling, distance weighting, all ranking priorities, No Travel/incomplete exclusion, provider behavior, and API orchestration. Frontend tests cover inputs and timestamp conversion. Playwright exercises desktop/mobile forms, route results, checkpoint inspection, the forecast slider, errors/retry, and overflow. Browser/API tests use isolated fixtures and do not prove live TomTom authorization. The frontend has no fixture mode.
 
-MapLibre is pinned to 5.24.0 with the upstream attribution-sanitizer security fix backported by `frontend/scripts/patch-maplibre-security.mjs`. Installation, development startup and builds verify/apply this patch; unknown package versions or contents fail closed. Run `npm.cmd run test:security` for patch-integrity regressions. Review this backport before changing the MapLibre pin. Version-based npm audit still reports 13 affected packages: this backported production dependency and 12 development-only entries. Retained tooling findings concern tinypool prototype-pollution gadgets, unused standalone Vitest mock-server plugins, and minimatch's unconfigured higher-optimization path. Use trusted local tests/configuration and keep development servers private; these findings are not a claim of zero security risk. Published fixes require incompatible dependency changes, including MapLibre 6.4.1+, so no forced upgrades or audit suppressions were applied.
+MapLibre is pinned to 5.24.0 with the upstream attribution-sanitizer security fix backported by `frontend/scripts/patch-maplibre-security.mjs`. Installation, development startup and builds verify/apply this patch; unknown package versions or contents fail closed. Run `npm.cmd run test:security` for patch-integrity regressions. Review this backport before changing the MapLibre pin. The prior version-based npm security audit reported 13 affected packages: this backported production dependency and 12 development-only entries. Retained tooling findings concern tinypool prototype-pollution gadgets, unused standalone Vitest mock-server plugins, and minimatch's unconfigured higher-optimization path. Use trusted local tests/configuration and keep development servers private; these findings are not a claim of zero security risk. Published fixes require incompatible dependency changes, including MapLibre 6.4.1+, so no forced upgrades or audit suppressions were applied.
 
-GitHub Actions runs backend/frontend tests, the production build and Chromium browser checks. Local audit reports, manual test records, optional helper scripts and walkthrough material are archived in the ignored `EXTRANEOUS/` folder.
+GitHub Actions runs backend/frontend tests, the production build and Chromium browser checks. Local audit reports, manual test records, optional helper scripts and walkthrough material are archived outside this repository and are not required to run, test or deploy the application.
 
 ## Deployment
 
@@ -238,11 +239,11 @@ All deployed backend instances share Redis for trips, weather and throttling. Ca
 
 Official configuration references: [Vercel Services](https://vercel.com/kb/guide/vercel-services), [Django on Vercel](https://vercel.com/docs/frameworks/full-stack/django). Python 3.13 is selected in `backend/.python-version`. No SQLite-backed application models or migrations are required.
 
-Deployment preparation checks: the Services JSON validated against Vercel's published schema. Ten new tests cover cache configuration, independent Redis-backed cache clients, cross-instance trip/forecast retrieval, TTLs, namespace isolation, missing/TLS-invalid URLs, and sanitized storage failures. These use fakeredis locally; live Redis credentials and actual Vercel deployment verification remain external steps.
+Deployment verification: the hosted frontend and `/api/health/` returned HTTP 200. A user-run hosted Dallas to Austin trip displayed three alternatives, checkpoint forecasts and arrival times; the user also confirmed that changing the forecast slider updated the displayed forecast values. This is a production smoke check, not verification of every route or edge case. Ten isolated deployment tests use fakeredis to cover cache configuration, independent Redis-backed cache clients, cross-instance trip/forecast retrieval, TTLs, namespace isolation, missing/TLS-invalid URLs, and sanitized storage failures.
 
-### Optional Docker / Render deployment
+### Optional local Docker deployment
 
-The supplied Docker image builds React and serves it with Django/WhiteNoise under one origin. Gunicorn uses one process with four threads. Without Redis, keep one process/instance; with `REDIS_URL`, cache data is shared. The existing `render.yaml` remains an optional Docker service blueprint. It generates a production secret and requires an authorized TomTom key.
+The supplied Docker image is an optional local deployment fallback; Vercel does not use it. It builds React and serves it with Django/WhiteNoise under one origin. Gunicorn uses one process with four threads. Without Redis, keep one process/instance; with `REDIS_URL`, cache data is shared. Supply a unique production secret and an authorized TomTom key.
 
 Local Docker verification:
 
@@ -252,12 +253,12 @@ docker build -t spotter-routing .
 docker run --rm -p 8000:8000 --env-file backend/.env -e DJANGO_DEBUG=false -e DJANGO_SECURE_SSL_REDIRECT=false spotter-routing
 ```
 
-Open http://localhost:8000 for this local Docker check. Public production deployments retain the default HTTPS redirect; do not disable it on Render.
+Open http://localhost:8000 for this local Docker check. Public production deployments retain the default HTTPS redirect.
 
 | Deliverable | Current link/status |
 |---|---|
 | GitHub repository | [Ahamdkhan1777/spotter-weather-routing](https://github.com/Ahamdkhan1777/spotter-weather-routing) |
-| Hosted frontend/backend | Vercel Services configuration prepared; live deployment pending |
+| Hosted frontend/backend | [Spotter AI](https://spotter-weather-routing-snowy.vercel.app/) / [Django health API](https://spotter-weather-routing-snowy.vercel.app/api/health/) |
 | Loom | Recording and upload not performed |
 
 ## Known limitations

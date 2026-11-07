@@ -78,7 +78,7 @@ def calculate_trip(inputs):
               'forecast_base_at': inputs['departure_at'].isoformat(), 'load_weight_lb': inputs['load_weight_lb'], 'interval_miles': inputs['interval_miles'],
               'routes': routes, 'recommended_route_id': recommended, 'recommendation_reason': reason,
               'warnings': list(dict.fromkeys(warnings)), 'providers': {'routing': 'TomTom truck', 'weather': 'Open-Meteo'}, 'expires_in_seconds': TRIP_TTL}
-    # One process with threads in deployment: the process-local cache is intentional, not durable storage.
+    # Shared Redis on Vercel; process-local cache during local development. Trips are ephemeral.
     cache.set(f'trip:{result["id"]}', {'result': result, 'points': points, 'series': series}, TRIP_TTL)
     return result
 
