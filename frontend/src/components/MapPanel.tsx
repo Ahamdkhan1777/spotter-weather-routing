@@ -13,6 +13,7 @@ interface Props {
 }
 const empty: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] }
 const sourceIds = ['routes', 'segments', 'checkpoints', 'forecast']
+const mapStyle = import.meta.env.VITE_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 const riskExpression: maplibregl.ExpressionSpecification = ['match', ['get', 'risk'],
   'Low', RISK_COLORS.Low, 'Moderate', RISK_COLORS.Moderate, 'High', RISK_COLORS.High,
   'Severe', RISK_COLORS.Severe, 'No Travel', RISK_COLORS['No Travel'], RISK_COLORS.Unknown]
@@ -35,17 +36,18 @@ export default function MapPanel(props: Props) {
   useEffect(() => {
     if (!container.current) return
     let map: MapType
+    let interactionsBound = false
     let loadTimeout: ReturnType<typeof setTimeout> | undefined
     setReady(false)
     setError('')
     try {
-      map = new maplibregl.Map({ container: container.current, style: import.meta.env.VITE_MAP_STYLE_URL || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json', center: [-98.3, 37.3], zoom: 3.8, attributionControl: { compact: true } })
+      map = new maplibregl.Map({ container: container.current, style: mapStyle, center: [-98.3, 37.3], zoom: 3.8, attributionControl: { compact: true } })
       mapRef.current = map
       loadTimeout = setTimeout(() => {
         if (!map.isStyleLoaded()) setError('The basemap is taking too long to load. Check your connection and retry; route summaries remain available.')
       }, 20000)
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
-      map.on('load', () => {
+      map.on('style.load', () => {
         clearTimeout(loadTimeout)
         for (const id of sourceIds) map.addSource(id, { type: 'geojson', data: empty })
         RISK_LEVELS.filter(level => level !== 'Unknown').forEach((level, index) => {
@@ -63,11 +65,15 @@ export default function MapPanel(props: Props) {
         map.addLayer({ id: 'risk-segments', type: 'line', source: 'segments', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': riskExpression, 'line-width': 5 } })
         map.addLayer({ id: 'checkpoint-circles', type: 'circle', source: 'checkpoints', paint: { 'circle-radius': ['case', ['get', 'endpoint'], 7, 4.5], 'circle-color': riskExpression, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 } })
         map.addLayer({ id: 'endpoint-labels', type: 'symbol', source: 'checkpoints', filter: ['==', ['get', 'endpoint'], true], layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'text-offset': [0, -1.5], 'text-anchor': 'bottom' }, paint: { 'text-color': '#203c35', 'text-halo-color': '#ffffff', 'text-halo-width': 2 } })
-        map.on('click', 'checkpoint-circles', event => { const id = event.features?.[0]?.properties?.id; if (id) latest.current.onCheckpoint(String(id)) })
-        map.on('click', 'route-lines', event => { if (map.queryRenderedFeatures(event.point, { layers: ['checkpoint-circles'] }).length) return; const id = event.features?.[0]?.properties?.id; if (id) latest.current.onRoute(String(id)) })
-        for (const layer of ['checkpoint-circles', 'route-lines']) {
-          map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer' })
-          map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = '' })
+        // Style changes rebuild layers; keep the interaction listeners registered once.
+        if (!interactionsBound) {
+          map.on('click', 'checkpoint-circles', event => { const id = event.features?.[0]?.properties?.id; if (id) latest.current.onCheckpoint(String(id)) })
+          map.on('click', 'route-lines', event => { if (map.queryRenderedFeatures(event.point, { layers: ['checkpoint-circles'] }).length) return; const id = event.features?.[0]?.properties?.id; if (id) latest.current.onRoute(String(id)) })
+          for (const layer of ['checkpoint-circles', 'route-lines']) {
+            map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer' })
+            map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = '' })
+          }
+          interactionsBound = true
         }
         setReady(true)
         setError('')
@@ -105,7 +111,7 @@ export default function MapPanel(props: Props) {
     if (ready && props.checkpoint) mapRef.current?.easeTo({ center: props.checkpoint.coordinates, duration: 500 })
   }, [ready, props.checkpoint])
 
-  return <div className="map-wrapper" data-map-status={ready ? 'ready' : error ? 'error' : 'loading'}>
+  return <div className="map-wrapper" data-map-theme="light" data-map-status={ready ? 'ready' : error ? 'error' : 'loading'}>
     <div ref={container} className="map-canvas" aria-label="Interactive truck route and weather map" />
     <div className="map-top-left"><div className="map-label"><Map size={14} />{props.trip ? 'Trip corridor' : 'Your road ahead'}</div>{props.trip && <span className="map-note">Route colors: weather at truck arrival</span>}</div>
     <div className="map-actions"><button className={props.heatmap ? 'active' : ''} onClick={props.onHeatmap} aria-pressed={props.heatmap}><Layers size={15} />Weather layer</button><button onClick={() => { if (props.trip && mapRef.current && ready) fitTrip(mapRef.current, props.trip) }} disabled={!props.trip || !ready} aria-label="Fit all routes on map" title="Fit all routes"><Expand size={16} /></button></div>

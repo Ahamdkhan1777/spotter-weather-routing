@@ -1,0 +1,8 @@
+target-version = "py313"
+line-length = 140
+extend-exclude = [".venv", "garbage", "EXTRANEOUS", "frontend", "backend/staticfiles"]
+
+[lint]
+# Catch correctness issues without reformatting the existing compact code style.
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E701", "E702", "E731"] # Existing compact statements and local lambdas are a style choice.

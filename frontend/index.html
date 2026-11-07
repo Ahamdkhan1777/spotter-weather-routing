@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#172b28" />
+    <meta name="theme-color" content="#1b2521" />
+    <script>
+      try { document.documentElement.dataset.theme = localStorage.getItem('spotter-theme') === 'light' ? 'light' : 'dark' }
+      catch { document.documentElement.dataset.theme = 'dark' }
+    </script>
     <meta name="description" content="Compare truck routes using arrival-time weather forecasts, cargo weight, and distance-based risk." />
     <title>Spotter AI · Weather-aware truck routing</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

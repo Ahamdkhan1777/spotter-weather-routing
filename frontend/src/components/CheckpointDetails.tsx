@@ -12,7 +12,7 @@ function WeatherValues({ point }: { point: { weather: Checkpoint['weather'] } })
 }
 
 export function CheckpointDetails({ checkpoint, forecast, hour, onClose }: { checkpoint: Checkpoint; forecast?: ForecastPoint; hour: number; onClose: () => void }) {
-  return <aside className="checkpoint-detail" aria-label="Checkpoint details">
+  return <aside id="checkpoint-details" className="checkpoint-detail" aria-label="Checkpoint details">
     <div className="checkpoint-detail-top"><div><span className="section-eyebrow">CHECKPOINT</span><h3><MapPin size={16} />Mile {number(checkpoint.distance_miles, 1)}</h3></div><button className="icon-button" onClick={onClose} aria-label="Close checkpoint details"><X size={17} /></button></div>
     <p className="coordinate-label">{checkpoint.coordinates[1].toFixed(4)}, {checkpoint.coordinates[0].toFixed(4)}</p>
     <div className="checkpoint-section"><div className="detail-subheading"><strong>At truck arrival</strong><RiskBadge level={checkpoint.risk.level} /></div><p>{dateTime(checkpoint.eta)}</p><WeatherValues point={checkpoint} /><p className="risk-reason">{checkpoint.risk.reason}</p>{checkpoint.weather && <small className="field-hint">Forecast hour ending {dateTime(checkpoint.weather.forecast_at)}</small>}</div>

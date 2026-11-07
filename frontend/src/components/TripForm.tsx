@@ -23,7 +23,7 @@ export function TripForm({ onSubmit, loading, configured, onCancel }: { onSubmit
     } catch (error) { setError((error as Error).message) }
   }}>
     <div className="section-eyebrow"><span>01</span> PLAN YOUR TRIP</div>
-    <div className="form-heading"><h2>A safer way<br />to get there.</h2><p>Know what’s ahead before you head out.</p></div>
+    <div className="form-heading"><h2>A safer way<br /> to get there.</h2><p>Know what’s ahead before you head out.</p></div>
     <div className="locations">
       <PlaceInput label="Origin" value={origin} onChange={setOrigin} enabled={configured && !loading} />
       <button type="button" className="swap-button" title="Swap origin and destination" aria-label="Swap origin and destination" onClick={() => { setOrigin(destination); setDestination(origin) }}><ArrowDownUp size={14} /></button>
@@ -38,7 +38,7 @@ export function TripForm({ onSubmit, loading, configured, onCancel }: { onSubmit
     {error && <p className="inline-error" role="alert">{error}</p>}
     <button className="calculate-button" type="submit" disabled={loading}>{loading ? <><LoaderCircle size={18} className="spin" />Analyzing your trip…</> : <><Route size={18} />Find the safest route<ArrowRight size={17} /></>}</button>
     {loading && <button className="text-button cancel-button" type="button" onClick={onCancel}><X size={13} />Cancel request</button>}
-    <div className="form-footnote"><ShieldIcon />Arrival-time weather. Load-aware risk.<br />One clear recommendation.</div>
+    <div className="form-footnote"><ShieldIcon />Arrival-time weather. Load-aware risk.<br /> One clear recommendation.</div>
   </form>
 }
 

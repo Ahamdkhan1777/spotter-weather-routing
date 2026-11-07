@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
+COPY frontend/scripts/patch-maplibre-security.mjs scripts/patch-maplibre-security.mjs
 RUN npm ci --no-fund --no-audit
 COPY frontend/ ./
 RUN npm run build

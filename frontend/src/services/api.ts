@@ -10,7 +10,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     response = await fetch(`${base}/api${path}`, { ...options, signal, headers: { 'Content-Type': 'application/json', ...options.headers } })
   } catch (error) {
     if (options.signal?.aborted) throw error
-    throw new Error('Cannot reach the routing service. Check that the Django backend is running, then retry.')
+    throw new Error('Cannot reach the routing service. Check that the Django backend is running, then retry.', { cause: error })
   }
   let data: unknown
   try { data = await response.json() } catch { throw new Error('The service returned an invalid response. Please retry.') }
