@@ -12,6 +12,7 @@ A React + Django trip planner that compares actual truck routes using weather at
 - MapLibre alternatives, risk-colored road segments, clickable checkpoints, detailed weather, and route summaries.
 - Forecast-backed corridor heatmap with real selected-hour data; slider changes do not alter arrival-time recommendations.
 - Responsive layout, loading/cancellation/retry states, provider/setup errors, and accessible text labels alongside colors.
+- Saved light/dark theme switch in the header. Both modes keep the clear light basemap. Dark mode is the default; switching preserves the current trip, selected checkpoint, and forecast hour.
 
 There are no user accounts, saved trips, fleet features, or production mock data. Trips are ephemeral calculations cached for one hour.
 
@@ -39,7 +40,7 @@ frontend/
   src/hooks/             Abortable, debounced, cached forecast retrieval
   src/services/          Typed HTTP client
   e2e/                   Isolated browser fixtures and interaction tests
-docs/                    API contract, assessment prompt, walkthrough, verification
+docs/                    API contract
 Dockerfile               Production frontend build + Django runtime
 render.yaml              Single-service deployment blueprint
 .github/workflows/ci.yml  Backend, frontend, build, and browser checks
@@ -50,7 +51,7 @@ No database-backed application models are required: normalized `Trip`, `Route`, 
 ## Prerequisites
 
 - Python 3.12–3.14 (verified locally with 3.14; deployment uses 3.13).
-- Node.js 22+ and npm.
+- Node.js 22.13+ or 24+ and npm (including ESLint development tooling).
 - A TomTom developer API key authorized for Search and Routing.
 - Internet access for provider APIs, basemap tiles, glyphs, and browser installation.
 - Docker is optional.
@@ -96,7 +97,7 @@ macOS/Linux equivalents use `python3 -m venv .venv`, `.venv/bin/python`, and `cp
 | `ALLOWED_HOSTS` | Comma-separated backend hostnames; Render hostname is included automatically |
 | `CORS_ALLOWED_ORIGINS` | Exact frontend origins for split hosting; default local Vite origins |
 | `TRUCK_EMPTY_WEIGHT_LB` | Empty vehicle weight, default 18,000 lb; cargo is added before TomTom's kg conversion |
-| `TRUCK_HEIGHT_M`, `TRUCK_WIDTH_M`, `TRUCK_LENGTH_M` | Optional real vehicle dimensions; unspecified if blank |
+| `TRUCK_HEIGHT_M`, `TRUCK_WIDTH_M`, `TRUCK_LENGTH_M` | Optional real vehicle dimensions in metres; blank/whitespace means unspecified. Configured values must be finite and positive; restart Django after changing them |
 | `PROVIDER_TIMEOUT_SECONDS` | Provider read timeout, default 15 seconds; connect timeout is 5 seconds |
 | `WEATHER_API_URL` | Open-Meteo forecast endpoint; set customer endpoint for a commercial subscription |
 | `OPEN_METEO_API_KEY` | Optional commercial key; server-side only |
@@ -106,7 +107,7 @@ macOS/Linux equivalents use `python3 -m venv .venv`, `.venv/bin/python`, and `cp
 | Frontend variable | Purpose |
 |---|---|
 | `VITE_API_BASE_URL` | Empty for local proxy or same-origin Docker; full backend origin for split hosting |
-| `VITE_MAP_STYLE_URL` | Public MapLibre style URL; defaults to CARTO Positron |
+| `VITE_MAP_STYLE_URL` | Public MapLibre style URL used in both themes; defaults to CARTO Positron |
 
 Frontend variables are public build-time configuration. Do not place private credentials in any `VITE_*` variable. `.env` files are ignored by Git and Docker.
 
@@ -138,7 +139,7 @@ Exactly 30,000/40,000 lb do not satisfy the respective strict inequalities. Miss
 
 The backend computes haversine lengths of consecutive road-geometry vertices, calibrates cumulative lengths to the provider's total road distance, and spherically interpolates positions at exact mileage targets. It preserves original road vertices in rendered segments. The origin and destination are always included, with no duplicate terminal checkpoint for an exact interval multiple.
 
-ETA uses `departure + total_duration × cumulative_distance / route_distance`. This is a documented uniform-speed approximation using provider traffic-aware duration, not segment-specific speeds. Rest stops, hours-of-service rules, and later traffic changes are excluded.
+Checkpoint ETA uses TomTom's cumulative distance/travel-time progress, requested with `extendedRouteRepresentation=distance` and `travelTime`. Elapsed time is interpolated between the surrounding provider progress points, so slower road sections receive more time. The profile must cover the entire route with finite, monotone distances/times and totals matching the route summary (within provider rounding). If unavailable or invalid, ETA falls back to `departure + total_duration × cumulative_distance / route_distance` and the trip notes explicitly disclose the uniform-speed estimate. Origin and destination times remain tied to departure and the provider's total duration. Rest stops, hours-of-service rules, and later traffic changes are excluded.
 
 Timestamps are offset-aware UTC internally. The form explicitly uses the device timezone; all displayed times use that timezone, including for trips crossing zones. Nonexistent spring-forward times are rejected; repeated fall-back times resolve to the browser's earlier occurrence. API callers can choose either repeated instant by sending an explicit offset. No naive departure timestamps are accepted.
 
@@ -183,21 +184,33 @@ Validation errors return 400; invalid locations/no route return 422; missing cre
 
 ## Tests and production build
 
+Install backend development tools with `.\.venv\Scripts\python.exe -m pip install -r backend/requirements-dev.txt`. ESLint requires Node 20.19+, 22.13+, or 24+. The frontend development dependencies are installed by `npm.cmd ci` in `frontend/`.
+
 ```powershell
+# From the project root
+.\.venv\Scripts\python.exe -m ruff check backend
+
 # From backend/
 ..\.venv\Scripts\python.exe manage.py check
 ..\.venv\Scripts\python.exe manage.py test tests --verbosity 2
 
 # From frontend/
+npm.cmd run lint
 npm test
 npm run build
 npx playwright install chromium
 npm run test:e2e
+
+# Optional quick checks in Chromium, Firefox and WebKit
+npx.cmd playwright install firefox webkit
+npm.cmd run test:cross-browser
 ```
 
 Backend tests cover supplied thresholds, load boundaries, invalid weather, geometry and ETA sampling, distance weighting, all ranking priorities, No Travel/incomplete exclusion, provider behavior, and API orchestration. Frontend tests cover inputs and timestamp conversion. Playwright exercises desktop/mobile forms, route results, checkpoint inspection, the forecast slider, errors/retry, and overflow. Browser/API tests use isolated fixtures and do not prove live TomTom authorization. The frontend has no fixture mode.
 
-GitHub Actions runs the same checks. [docs/VERIFICATION.md](docs/VERIFICATION.md) records actual local results and verification limits.
+MapLibre is pinned to 5.24.0 with the upstream attribution-sanitizer security fix backported by `frontend/scripts/patch-maplibre-security.mjs`. Installation, development startup and builds verify/apply this patch; unknown package versions or contents fail closed. Run `npm.cmd run test:security` for patch-integrity regressions. Review this backport before changing the MapLibre pin. Version-based npm audit still reports 13 affected packages: this backported production dependency and 12 development-only entries. Retained tooling findings concern tinypool prototype-pollution gadgets, unused standalone Vitest mock-server plugins, and minimatch's unconfigured higher-optimization path. Use trusted local tests/configuration and keep development servers private; these findings are not a claim of zero security risk. Published fixes require incompatible dependency changes, including MapLibre 6.4.1+, so no forced upgrades or audit suppressions were applied.
+
+GitHub Actions runs backend/frontend tests, the production build and Chromium browser checks. Local audit reports, manual test records, optional helper scripts and walkthrough material are archived in the ignored `EXTRANEOUS/` folder.
 
 ## Deployment
 
@@ -225,7 +238,7 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 |---|---|
 | GitHub repository | Local Git repository created; publishing requires a connected GitHub account |
 | Hosted frontend/backend | Docker/Render files prepared; no hosted URL verified |
-| Loom | Walkthrough script prepared; recording and upload not performed |
+| Loom | Recording and upload not performed |
 
 ## Known limitations
 
@@ -233,12 +246,8 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 - Forecast horizon varies by weather model, field, location, and departure; requested 16-day data is not a guarantee of complete coverage.
 - Only cargo weight is entered by the user. Truck empty weight/dimensions are operator configuration; unspecified dimensions are not checked.
 - The route recommendation follows the assessment's load rules exactly, including their supplied heavier-load wind overrides.
-- Uniform-speed checkpoint ETAs and conservative endpoint segment risks are approximations.
+- Checkpoint ETAs interpolate provider timing points, with a disclosed uniform-speed fallback when unavailable. Conservative endpoint segment risks remain sampled estimates.
 - Corridor forecasts are sparse spatial samples rendered as kernels, not radar.
 - The in-memory cache is ephemeral and single-process; a restart invalidates trips and the UI requests recalculation.
 - Provider, map tile, and forecast licensing/quotas must be suitable for actual traffic. Extensive trips exceeding 450 unique samples return a clear sampling-limit error; choose a coarser interval or shorter trip.
 - The publicly accessible evaluation API has per-process anonymous calculation/search throttling; sustained production use should add shared throttling at the platform edge.
-
-## Walkthrough
-
-[docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) contains an approximately 8-minute recording script and live verification checklist. Record the actual configured, hosted app; disclose unavailable credentials and unverified features. Do not use test fixtures as evidence of live routing.
