@@ -39,6 +39,8 @@ The successful response contains:
 
 `id`, `[lon,lat]` `coordinates`, `distance_miles`, `eta`, `weather` (nullable), and `risk`.
 
+`eta` interpolates TomTom cumulative travel-time progress by distance when a valid complete profile is returned. If that optional data is absent or invalid, the existing uniform-speed estimate is used and disclosed in `warnings`. Departure and destination retain the provider's total trip duration. Timing changes affect arrival-weather lookup; risk thresholds and ranking rules are unchanged.
+
 Weather fields: `forecast_at`, `wind_mph`, `rain_in_per_hour`, `snow_in_per_hour`. Individual values can be null; they are not converted to zero. Hourly rainfall includes rain and showers, excluding snowfall water equivalent.
 
 Risk fields: `level` (`Low`, `Moderate`, `High`, `Severe`, `No Travel`, `Unknown`), `complete`, individual `conditions`, and `reason`.
@@ -50,6 +52,8 @@ A segment has `start_miles`, `end_miles`, `risk`, and a GeoJSON LineString `geom
 Summary has `risk_miles` keyed by every risk level including Unknown, `average_risk` (0–4 or null), `coverage_percent`, `complete`, `blocked`, and `eligible`. Risk miles sum to route distance; percentages and averages are distance-weighted. Unknown weather is excluded from safe recommendations, not from total distance.
 
 ## GET /trips/{id}/forecast/?hour=0..48
+
+`hour` accepts one or two ASCII decimal digits from 0 through 48; omission defaults to 0. Malformed or oversized values return HTTP 400 with `invalid_hour` before reading the trip cache.
 
 Returns `hour`, ISO `timestamp`, `points`, `missing_count`, and `total_points`. Each point has `id`, `coordinates`, `kind` (`checkpoint` or `corridor`), `weather`, and `risk`. The timestamp is trip departure plus the selected integer hours. Checkpoint point IDs match arrival-time checkpoint IDs, allowing side-by-side inspection.
 

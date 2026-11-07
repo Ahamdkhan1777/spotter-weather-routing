@@ -49,7 +49,7 @@ def calculate_trip(inputs):
     routes = []
     for raw in raw_routes:
         geometry = RouteGeometry(raw['coordinates'], raw['distance_meters'])
-        checkpoints = generate_checkpoints(geometry, inputs['interval_miles'], raw['duration_seconds'], inputs['departure_at'], raw['id'])
+        checkpoints = generate_checkpoints(geometry, inputs['interval_miles'], raw['duration_seconds'], inputs['departure_at'], raw['id'], raw.get('timing'))
         routes.append({'id': raw['id'], 'name': raw['name'], 'geometry': {'type': 'LineString', 'coordinates': raw['coordinates']},
                        'distance_miles': raw['distance_meters']/METERS_PER_MILE, 'duration_seconds': raw['duration_seconds'],
                        'arrival_at': checkpoints[-1]['eta'], 'truck_supported': raw['truck_supported'], 'checkpoints': checkpoints})

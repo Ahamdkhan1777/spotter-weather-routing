@@ -41,6 +41,24 @@ class APITests(SimpleTestCase):
                 self.assertEqual(self.client.post('/api/routes/calculate/', {**self.payload, **changes}, format='json').status_code, 400)
 
     @patch('services.trips.geocode')
+    def test_boolean_load_weights_return_validation_errors_without_provider_calls(self, geocoding):
+        for value in [True, False]:
+            with self.subTest(value=value):
+                response = self.client.post('/api/routes/calculate/', {**self.payload, 'load_weight_lb': value}, format='json')
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('load_weight_lb', str(response.json()))
+        geocoding.assert_not_called()
+
+    @patch('services.trips.geocode')
+    def test_impossible_departures_return_validation_errors_without_provider_calls(self, geocoding):
+        for value in ['2026-02-30T12:00:00Z', '2026-13-01T12:00:00Z', '2026-11-06T25:00:00Z', '2026-11-06T12:00:00+25:00']:
+            with self.subTest(value=value):
+                response = self.client.post('/api/routes/calculate/', {**self.payload, 'departure_at': value}, format='json')
+                self.assertEqual(response.status_code, 400)
+                self.assertIn('departure_at', str(response.json()))
+        geocoding.assert_not_called()
+
+    @patch('services.trips.geocode')
     @patch('services.routing.get_json', return_value=route_fixture())
     @patch('services.weather.get_json')
     @override_settings(TOMTOM_API_KEY='test-secret')
@@ -99,6 +117,16 @@ class APITests(SimpleTestCase):
         for value in ['-1', '49', '1.5', 'abc']:
             self.assertEqual(self.client.get(prefix, {'hour': value}).status_code, 400)
         self.assertEqual(self.client.get(prefix).status_code, 404)
+
+    @patch('routing.views.forecast_for_trip')
+    def test_malformed_numeric_forecast_hours_are_validation_errors(self, forecast):
+        prefix = '/api/trips/00000000-0000-0000-0000-000000000000/forecast/'
+        for value in ['\u00b2', '1' * 4400]:
+            with self.subTest(length=len(value)):
+                response = self.client.get(prefix, {'hour': value})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()['error']['code'], 'invalid_hour')
+        forecast.assert_not_called()
 
     @patch('services.providers.requests.get')
     def test_transport_errors_and_no_secret_leak(self, get):

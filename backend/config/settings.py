@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from .truck import load_truck_dimensions
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -44,7 +45,7 @@ SECURE_HSTS_PRELOAD = not DEBUG
 SECURE_SSL_REDIRECT = os.getenv('DJANGO_SECURE_SSL_REDIRECT', str(not DEBUG)).lower() == 'true'
 TOMTOM_API_KEY = os.getenv('TOMTOM_API_KEY', '')
 TRUCK_EMPTY_WEIGHT_LB = float(os.getenv('TRUCK_EMPTY_WEIGHT_LB', '18000'))
-TRUCK_DIMENSIONS = {key: float(os.environ[env]) for key, env in [('vehicleHeight', 'TRUCK_HEIGHT_M'), ('vehicleWidth', 'TRUCK_WIDTH_M'), ('vehicleLength', 'TRUCK_LENGTH_M')] if os.getenv(env)}
+TRUCK_DIMENSIONS = load_truck_dimensions(os.environ)
 PROVIDER_TIMEOUT_SECONDS = float(os.getenv('PROVIDER_TIMEOUT_SECONDS', '15'))
 WEATHER_API_URL = os.getenv('WEATHER_API_URL', 'https://api.open-meteo.com/v1/forecast')
 OPEN_METEO_API_KEY = os.getenv('OPEN_METEO_API_KEY', '')

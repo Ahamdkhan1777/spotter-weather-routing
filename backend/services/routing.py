@@ -3,6 +3,7 @@ import math
 from django.conf import settings
 from .checkpoints import RouteGeometry
 from .providers import ProviderError, get_json, tomtom_key
+from .travel_time import timing_profile
 
 
 def calculate_routes(origin, destination, departure, load_weight_lb):
@@ -15,6 +16,7 @@ def calculate_routes(origin, destination, departure, load_weight_lb):
         'key': key, 'maxAlternatives': 2, 'alternativeType': 'anyRoute', 'travelMode': 'truck',
         'vehicleCommercial': 'true', 'vehicleWeight': math.ceil((load_weight_lb + settings.TRUCK_EMPTY_WEIGHT_LB)*0.45359237),
         'routeRepresentation': 'polyline', 'routeType': 'fastest', 'traffic': 'true',
+        'extendedRouteRepresentation': ['distance', 'travelTime'],
         'departAt': departure.isoformat(), 'sectionType': 'travelMode', **settings.TRUCK_DIMENSIONS,
     }
     data = get_json(f'https://api.tomtom.com/routing/1/calculateRoute/{locations}/json', params, 'TomTom routing')
@@ -42,8 +44,12 @@ def calculate_routes(origin, destination, departure, load_weight_lb):
                     continue
                 seen.add(signature)
                 truck_supported = not any(s.get('sectionType') == 'TRAVEL_MODE' and s.get('travelMode') != 'truck' for s in raw.get('sections', []))
+                timing = timing_profile(raw.get('progress'), distance, duration)
+                if timing is None:
+                    warnings.append('Provider travel-time progress is unavailable or invalid; checkpoint ETAs use a uniform-speed estimate.')
                 routes.append({'id': f'route-{len(routes)+1}', 'name': f'Route {len(routes)+1}', 'coordinates': coordinates,
-                               'distance_meters': distance, 'duration_seconds': duration, 'truck_supported': truck_supported})
+                               'distance_meters': distance, 'duration_seconds': duration, 'truck_supported': truck_supported,
+                               'timing': timing})
                 if len(routes) == 3:
                     break
             except (KeyError, TypeError, ValueError, ProviderError):

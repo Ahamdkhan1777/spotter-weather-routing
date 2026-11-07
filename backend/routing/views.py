@@ -44,6 +44,6 @@ def detail(request, trip_id):
 @throttle_classes([])
 def forecast(request, trip_id):
     raw = request.query_params.get('hour', '0')
-    if not raw.isdigit() or not 0 <= int(raw) <= 48:
+    if not (1 <= len(raw) <= 2 and raw.isascii() and raw.isdecimal()) or not 0 <= int(raw) <= 48:
         return Response({'error': {'code': 'invalid_hour', 'message': 'Forecast hour must be an integer from 0 to 48.'}}, status=400)
     return provider_response(lambda: forecast_for_trip(trip_id, int(raw)))

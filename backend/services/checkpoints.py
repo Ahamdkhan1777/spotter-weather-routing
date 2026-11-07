@@ -2,6 +2,7 @@ from bisect import bisect_right
 from datetime import timedelta
 import math
 from .providers import ProviderError
+from .travel_time import TravelTime
 
 METERS_PER_MILE = 1609.344
 EARTH_METERS = 6371008.8
@@ -62,7 +63,7 @@ class RouteGeometry:
         return [self.position(start), *self.coordinates[left:right], self.position(end)]
 
 
-def generate_checkpoints(geometry, interval_miles, duration_seconds, departure, route_id):
+def generate_checkpoints(geometry, interval_miles, duration_seconds, departure, route_id, timing=None):
     if interval_miles not in (10, 25, 50):
         raise ValueError('Checkpoint interval must be 10, 25, or 50 miles.')
     if not math.isfinite(duration_seconds) or duration_seconds <= 0:
@@ -76,8 +77,9 @@ def generate_checkpoints(geometry, interval_miles, duration_seconds, departure, 
         distances.append(geometry.total)
     else:
         distances[-1] = geometry.total
+    travel_time = TravelTime(geometry.total, duration_seconds, timing)
     return [{
         'id': f'{route_id}-cp-{index}', 'coordinates': geometry.position(distance),
         'distance_miles': distance / METERS_PER_MILE,
-        'eta': (departure + timedelta(seconds=duration_seconds*distance/geometry.total)).isoformat(),
+        'eta': (departure + timedelta(seconds=travel_time.at(distance))).isoformat(),
     } for index, distance in enumerate(distances)]
