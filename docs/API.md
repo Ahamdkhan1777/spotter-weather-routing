@@ -20,7 +20,7 @@ The successful response contains:
 
 | Field | Type/content |
 |---|---|
-| `id` | Trip UUID, valid in ephemeral server cache for up to 3600 seconds |
+| `id` | Trip UUID, cached for up to 3600 seconds; Redis is shared between Vercel instances |
 | `origin`, `destination` | `{label, coordinates: [lon,lat]}` |
 | `departure_at`, `forecast_base_at` | Departure timestamp; the latter anchors the slider |
 | `load_weight_lb`, `interval_miles` | Normalized inputs |
@@ -69,4 +69,4 @@ This endpoint reads previously retrieved forecast series; it does not change rou
 
 Provider errors use `{error: {code, message}}` with 422 (invalid location/no routes/sampling limit), 429 (provider limit), 502 (provider/network/invalid response), 503 (credentials), or 504 (timeout). DRF validation errors use field-keyed message arrays with 400. Expired trips use `trip_expired`/404. Forecast provider failures during calculation return explicit warnings, incomplete coverage, and Unknown data; no route is recommended on that basis.
 
-No raw third-party exception URLs or API keys are included. Anonymous search/calculation requests are limited to 120/hour/process. The forecast endpoint is unthrottled to support slider interaction and only reads cached data.
+No raw third-party exception URLs, Redis connection details or API keys are included. Anonymous search/calculation requests are limited to 120/hour through the configured cache (shared across instances when Redis is configured). The forecast endpoint is unthrottled to support slider interaction and only reads cached data. Redis failures return `cache_unavailable`/503. Trip expiry, eviction or a new deployment namespace requires recalculation.

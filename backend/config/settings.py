@@ -2,18 +2,23 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from .truck import load_truck_dimensions
+from .cache import cache_settings, deployment_hosts
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
-DEBUG = os.getenv('DJANGO_DEBUG', 'true').lower() == 'true'
+DEBUG = os.getenv('DJANGO_DEBUG', 'false' if os.getenv('VERCEL') == '1' else 'true').lower() == 'true'
+if os.getenv('VERCEL') == '1' and DEBUG:
+    raise ValueError('DJANGO_DEBUG must be false on Vercel.')
 SECRET_KEY = os.getenv('SECRET_KEY', 'development-only-spotter-key')
 if not DEBUG and SECRET_KEY in ('development-only-spotter-key', 'local-development-change-before-deployment'):
     raise ValueError('Set a unique SECRET_KEY before running in production.')
 ALLOWED_HOSTS = [x.strip() for x in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',') if x.strip()]
+ALLOWED_HOSTS.extend(deployment_hosts(os.environ))
 if os.getenv('RENDER_EXTERNAL_HOSTNAME'):
     ALLOWED_HOSTS.append(os.environ['RENDER_EXTERNAL_HOSTNAME'])
 INSTALLED_APPS = ['django.contrib.contenttypes', 'django.contrib.staticfiles', 'rest_framework', 'corsheaders', 'routing']
 MIDDLEWARE = ['django.middleware.security.SecurityMiddleware', 'corsheaders.middleware.CorsMiddleware', 'django.middleware.common.CommonMiddleware']
+MIDDLEWARE.append('config.middleware.CacheUnavailableMiddleware')
 if not DEBUG:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 ROOT_URLCONF = 'config.urls'
@@ -23,7 +28,7 @@ USE_TZ = True
 TIME_ZONE = 'UTC'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [x.strip() for x in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',') if x.strip()]
-CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', 'LOCATION': 'spotter', 'OPTIONS': {'MAX_ENTRIES': 2500}}}
+CACHES = cache_settings(os.environ)
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
     'UNAUTHENTICATED_USER': None,
@@ -33,7 +38,7 @@ REST_FRAMEWORK = {
 }
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-WHITENOISE_ROOT = BASE_DIR.parent / 'frontend' / 'dist'
+WHITENOISE_ROOT = None if os.getenv('VERCEL') == '1' else BASE_DIR.parent / 'frontend' / 'dist'
 WHITENOISE_MAX_AGE = 86400
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

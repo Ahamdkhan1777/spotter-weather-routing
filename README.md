@@ -214,15 +214,35 @@ GitHub Actions runs backend/frontend tests, the production build and Chromium br
 
 ## Deployment
 
-The supplied Docker image builds React and serves it with Django/WhiteNoise. All APIs and assets share one origin. Gunicorn uses **one process with four threads** because trip/weather caching is deliberately process-local. Do not add workers/replicas without replacing the cache with a shared backend.
+### Vercel: React + Django + Redis
 
-1. Publish this project as a separate GitHub repository.
-2. In Render, create a Blueprint from that repository using `render.yaml`, or create a Docker web service.
-3. Supply `TOMTOM_API_KEY`. The blueprint generates `SECRET_KEY` and disables debug.
-4. Adjust empty weight and dimensions for the vehicle. Review the selected service plan and provider licenses.
-5. Deploy, open the returned HTTPS URL, check `/api/health/`, calculate a real trip, inspect checkpoint weather, and move the slider.
+The root `vercel.json` defines two Services: Vite in `frontend/` and Django in `backend/`. Public `/api/*` requests go to Django with their path preserved; other requests go to React. Both use the same domain, so `VITE_API_BASE_URL` stays unset. The MapLibre security patch remains part of the frontend install and build steps.
 
-No database provisioning or migration is needed. See [Render's Django guide](https://render.com/docs/deploy-django) for hosting background. This project uses Docker and an ephemeral cache rather than the guide's database-backed example. No free-tier or deployment-success claim is made.
+1. Create a Redis database, for example through [Vercel Marketplace Redis](https://vercel.com/docs/redis) / Upstash. Obtain its **TLS TCP connection URL** (`rediss://default:password@host:port`), not the HTTPS REST URL/token pair. Check your provider's limits and selected plan.
+2. Import the repository in Vercel. Keep **Root Directory `./`** and **Application Preset `Services`**. Import both services together rather than selecting an individual application.
+3. Add the following private project environment variables for the environments you intend to deploy. Use separate credentials/databases for production and previews where possible. Never prefix private keys with `VITE_` or commit their values.
+
+| Variable | Value |
+|---|---|
+| `TOMTOM_API_KEY` | Your authorized routing/search API key |
+| `SECRET_KEY` | A new random Django secret, generated privately with `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `DJANGO_DEBUG` | `false` |
+| `REDIS_URL` | The Redis provider's TLS `rediss://` connection URL |
+| `TRUCK_EMPTY_WEIGHT_LB` | Real vehicle's empty weight; default is 18000 |
+| `ALLOWED_HOSTS` | Add any custom domain you use; Vercel deployment/branch/production hostnames are also read from system variables |
+
+4. Leave `VITE_API_BASE_URL` unset so the frontend calls same-origin `/api`. Keep Vercel's system environment variables exposed to the backend. Standard public Open-Meteo evaluation and CARTO configuration need no extra key for this setup; review provider terms for actual use.
+5. Deploy. Confirm `/api/health/`, calculate a real trip, select alternatives/checkpoints, and move the forecast slider through 0/12/24/48/0. Check both frontend and backend logs if a build or request fails. This repository configuration alone is not evidence of a successful hosted deployment.
+
+All deployed backend instances share Redis for trips, weather and throttling. Cache keys are isolated by deployment and environment; a new deployment starts a new namespace. Trips still expire after one hour. Local development without `REDIS_URL` retains the existing process-memory cache. On Vercel, missing Redis or enabled debug mode stops startup; Redis errors return a sanitized HTTP 503 rather than inventing a forecast or a recommendation.
+
+Official configuration references: [Vercel Services](https://vercel.com/kb/guide/vercel-services), [Django on Vercel](https://vercel.com/docs/frameworks/full-stack/django). Python 3.13 is selected in `backend/.python-version`. No SQLite-backed application models or migrations are required.
+
+Deployment preparation checks: the Services JSON validated against Vercel's published schema. Ten new tests cover cache configuration, independent Redis-backed cache clients, cross-instance trip/forecast retrieval, TTLs, namespace isolation, missing/TLS-invalid URLs, and sanitized storage failures. These use fakeredis locally; live Redis credentials and actual Vercel deployment verification remain external steps.
+
+### Optional Docker / Render deployment
+
+The supplied Docker image builds React and serves it with Django/WhiteNoise under one origin. Gunicorn uses one process with four threads. Without Redis, keep one process/instance; with `REDIS_URL`, cache data is shared. The existing `render.yaml` remains an optional Docker service blueprint. It generates a production secret and requires an authorized TomTom key.
 
 Local Docker verification:
 
@@ -236,8 +256,8 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 
 | Deliverable | Current link/status |
 |---|---|
-| GitHub repository | Local Git repository created; publishing requires a connected GitHub account |
-| Hosted frontend/backend | Docker/Render files prepared; no hosted URL verified |
+| GitHub repository | [Ahamdkhan1777/spotter-weather-routing](https://github.com/Ahamdkhan1777/spotter-weather-routing) |
+| Hosted frontend/backend | Vercel Services configuration prepared; live deployment pending |
 | Loom | Recording and upload not performed |
 
 ## Known limitations
@@ -248,6 +268,6 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 - The route recommendation follows the assessment's load rules exactly, including their supplied heavier-load wind overrides.
 - Checkpoint ETAs interpolate provider timing points, with a disclosed uniform-speed fallback when unavailable. Conservative endpoint segment risks remain sampled estimates.
 - Corridor forecasts are sparse spatial samples rendered as kernels, not radar.
-- The in-memory cache is ephemeral and single-process; a restart invalidates trips and the UI requests recalculation.
+- Local memory caching is single-process and resets on restart. Vercel uses shared Redis; expiry, eviction or a new deployment namespace requires recalculation.
 - Provider, map tile, and forecast licensing/quotas must be suitable for actual traffic. Extensive trips exceeding 450 unique samples return a clear sampling-limit error; choose a coarser interval or shorter trip.
-- The publicly accessible evaluation API has per-process anonymous calculation/search throttling; sustained production use should add shared throttling at the platform edge.
+- Anonymous calculation/search throttling uses the configured cache (shared Redis on Vercel). Sustained production use should also consider platform edge limits and provider quotas.
