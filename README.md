@@ -2,6 +2,15 @@
 
 A React + Django trip planner that compares actual truck routes using weather at the truck's estimated arrival time. Cargo load affects wind risk; a deterministic, distance-weighted comparison selects an eligible route. An independent 0–48-hour forecast slider explores weather across the trip corridor.
 
+## Live application
+
+| Service | Deployed URL |
+|---|---|
+| React frontend | [https://spotter-weather-routing-snowy.vercel.app/](https://spotter-weather-routing-snowy.vercel.app/) |
+| Django backend health API | [https://spotter-weather-routing-snowy.vercel.app/api/health/](https://spotter-weather-routing-snowy.vercel.app/api/health/) |
+
+Both services are deployed on Vercel under the same domain. React serves `/`; Django handles `/api/` endpoints. The backend link returns JSON service status, not a separate webpage. See [API documentation](docs/API.md) for the other endpoints.
+
 ## Features
 
 - Human-readable origin/destination search, local departure date/time, cargo weight in pounds, and 10/25/50-mile checkpoint spacing.
@@ -258,7 +267,8 @@ Open http://localhost:8000 for this local Docker check. Public production deploy
 | Deliverable | Current link/status |
 |---|---|
 | GitHub repository | [Ahamdkhan1777/spotter-weather-routing](https://github.com/Ahamdkhan1777/spotter-weather-routing) |
-| Hosted frontend/backend | [Spotter AI](https://spotter-weather-routing-snowy.vercel.app/) / [Django health API](https://spotter-weather-routing-snowy.vercel.app/api/health/) |
+| Hosted frontend | [Spotter AI web application](https://spotter-weather-routing-snowy.vercel.app/) |
+| Hosted backend | [Django health API](https://spotter-weather-routing-snowy.vercel.app/api/health/) |
 | Loom | Recording and upload not performed |
 
 ## Known limitations
